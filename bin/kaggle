@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'kaggle'
+require 'optparse'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: kaggle [command] [options]"
+  
+  opts.on("-u", "--username USERNAME", "Kaggle username") do |username|
+    options[:username] = username
+  end
+  
+  opts.on("-k", "--key KEY", "Kaggle API key") do |key|
+    options[:api_key] = key
+  end
+  
+  opts.on("-d", "--download-path PATH", "Download path (default: ./downloads)") do |path|
+    options[:download_path] = path
+  end
+  
+  opts.on("-c", "--cache-path PATH", "Cache path (default: ./cache)") do |path|
+    options[:cache_path] = path
+  end
+  
+  opts.on("--use-cache", "Use cached data when available") do
+    options[:use_cache] = true
+  end
+  
+  opts.on("--parse-csv", "Parse CSV files to JSON") do
+    options[:parse_csv] = true
+  end
+  
+  opts.on("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+  
+  opts.on("-v", "--version", "Show version") do
+    puts Kaggle::VERSION
+    exit
+  end
+end.parse!
+
+command = ARGV[0]
+
+case command
+when 'list'
+  client = Kaggle::Client.new(options)
+  datasets = client.list_datasets(search: ARGV[1])
+  puts JSON.pretty_generate(datasets)
+  
+when 'download'
+  unless ARGV[1] && ARGV[2]
+    puts "Usage: kaggle download OWNER DATASET"
+    exit 1
+  end
+  
+  client = Kaggle::Client.new(options)
+  result = client.download_dataset(ARGV[1], ARGV[2], options)
+  
+  if options[:parse_csv]
+    puts "Parsed data:"
+    puts JSON.pretty_generate(result.first(5)) # Show first 5 rows
+    puts "... (showing first 5 rows of #{result.length} total)"
+  else
+    puts "Downloaded to: #{result}"
+  end
+  
+when 'files'
+  unless ARGV[1] && ARGV[2]
+    puts "Usage: kaggle files OWNER DATASET"
+    exit 1
+  end
+  
+  client = Kaggle::Client.new(options)
+  files = client.dataset_files(ARGV[1], ARGV[2])
+  puts JSON.pretty_generate(files)
+  
+else
+  puts "Available commands: list, download, files"
+  puts "Use 'kaggle --help' for more information"
+end

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+set -vx
+
+bundle install
+
+echo "Setup completed successfully!"
+echo "Run 'bin/console' for an interactive prompt that will allow you to experiment."
+echo "Run 'rake test' to run the test suite."

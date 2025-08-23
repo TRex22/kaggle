@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'kaggle'
+require 'pry'
+
+Pry.start
