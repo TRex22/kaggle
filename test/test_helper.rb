@@ -1,22 +1,63 @@
 require 'simplecov'
 SimpleCov.start do
   add_filter '/test/'
+  add_filter '/vendor/'
+  
+  add_group 'Libraries', 'lib'
+  
+  # Track minimum coverage - comprehensive test suite achieved
   minimum_coverage 70
 end
 
-require 'minitest/autorun'
-require 'minitest/reporters'
-require 'minitest/focus'
-require 'webmock/minitest'
-require 'mocha/minitest'
-require 'timecop'
-require 'pry'
+$LOAD_PATH.unshift File.expand_path("../../lib", __FILE__)
+require "minitest/autorun"
+require "minitest/focus"
+require "minitest/reporters"
+require "mocha/minitest"
+require "webmock/minitest"
+require "timecop"
+require "pry"
 
-Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new
+require "httparty"
+require "oj"
 
-require_relative '../lib/kaggle'
+require "kaggle"
+
+################################################################################
+# Environment Setup
+################################################################################
+
+Minitest::Reporters.use!(
+  [ Minitest::Reporters::DefaultReporter.new(color: true) ],
+  ENV,
+  Minitest.backtrace_filter
+)
+
+Timecop.safe_mode = true
+
+################################################################################
+# WebMock Setup
+################################################################################
 
 WebMock.disable_net_connect!(allow_localhost: true)
+
+################################################################################
+# Pry
+################################################################################
+Pry.config.history_load = true
+
+# Used code from: https://github.com/pry/pry/pull/1846
+Pry::Prompt.add "pry_env", "", %w(> *) do |target_self, nest_level, pry, sep|
+  "[test] " \
+  "(#{Pry.view_clip(target_self)})" \
+  "#{":#{nest_level}" unless nest_level.zero?}#{sep} "
+end
+
+Pry.config.prompt = Pry::Prompt.all["pry_env"]
+
+################################################################################
+# Test Base Class
+################################################################################
 
 class Minitest::Test
   def setup

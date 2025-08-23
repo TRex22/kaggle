@@ -38,22 +38,27 @@ class Kaggle::ClientTest < Minitest::Test
   end
 
   def test_initialization_with_custom_paths
+    temp_download = Dir.mktmpdir
+    temp_cache = Dir.mktmpdir
+    
     client = Kaggle::Client.new(
       username: 'user',
       api_key: 'key',
-      download_path: '/custom/downloads',
-      cache_path: '/custom/cache',
+      download_path: temp_download,
+      cache_path: temp_cache,
       timeout: 60
     )
     
-    assert_equal '/custom/downloads', client.download_path
-    assert_equal '/custom/cache', client.cache_path
+    assert_equal temp_download, client.download_path
+    assert_equal temp_cache, client.cache_path
     assert_equal 60, client.timeout
+  ensure
+    FileUtils.rm_rf(temp_download) if temp_download && Dir.exist?(temp_download)
+    FileUtils.rm_rf(temp_cache) if temp_cache && Dir.exist?(temp_cache)
   end
 
   def test_list_datasets_success
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list")
-      .with(query: hash_including(page: 1, size: 20))
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
       .to_return(status: 200, body: '{"datasets": []}')
 
     result = @client.list_datasets
@@ -61,15 +66,14 @@ class Kaggle::ClientTest < Minitest::Test
   end
 
   def test_list_datasets_with_options
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list")
-      .with(query: hash_including(page: 2, search: 'housing', size: 10))
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=2&search=housing&size=10")
       .to_return(status: 200, body: '{"datasets": []}')
 
     @client.list_datasets(page: 2, search: 'housing', page_size: 10)
   end
 
   def test_list_datasets_failure
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list")
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
       .to_return(status: 404, body: 'Not found')
 
     assert_raises(Kaggle::Error) do
@@ -129,7 +133,7 @@ class Kaggle::ClientTest < Minitest::Test
   end
 
   def test_parse_csv_to_json_with_malformed_csv
-    malformed_csv = create_temp_csv("name,age\nJohn,30,extra")
+    malformed_csv = create_temp_csv("name,age\nJohn,\"unclosed quote\nJane,25")
     
     assert_raises(Kaggle::ParseError) do
       @client.parse_csv_to_json(malformed_csv.path)
@@ -142,8 +146,58 @@ class Kaggle::ClientTest < Minitest::Test
   def test_download_dataset_creates_directories
     FileUtils.expects(:mkdir_p).with('./downloads').once
     FileUtils.expects(:mkdir_p).with('./cache').once
+    Dir.expects(:exist?).with('./downloads').returns(false).once
+    Dir.expects(:exist?).with('./cache').returns(false).once
     
     Kaggle::Client.new(username: @username, api_key: @api_key)
+  end
+
+  def test_download_dataset_success_with_webmock
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/download/owner/dataset")
+      .with(
+        headers: {
+          'Accept' => 'application/json',
+          'User-Agent' => 'Kaggle Ruby Client/0.0.1'
+        }
+      )
+      .to_return(
+        status: 200,
+        body: 'fake zip file content',
+        headers: { 'Content-Type' => 'application/zip' }
+      )
+
+    result = @client.download_dataset('owner', 'dataset')
+    
+    assert_kind_of String, result
+    assert_includes result, 'downloads'
+    assert_includes result, '.zip'
+  end
+
+  def test_download_dataset_failure_with_webmock
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/download/owner/dataset")
+      .to_return(status: 404, body: 'Dataset not found')
+
+    assert_raises(Kaggle::DownloadError) do
+      @client.download_dataset('owner', 'dataset')
+    end
+  end
+
+  def test_list_datasets_with_json_parse_error
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
+      .to_return(status: 200, body: 'invalid json')
+
+    assert_raises(Kaggle::ParseError) do
+      @client.list_datasets
+    end
+  end
+
+  def test_dataset_files_with_json_parse_error
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/data/owner/dataset")
+      .to_return(status: 200, body: 'invalid json')
+
+    assert_raises(Kaggle::ParseError) do
+      @client.dataset_files('owner', 'dataset')
+    end
   end
 
   private

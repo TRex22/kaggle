@@ -49,7 +49,7 @@ case command
 when 'list'
   client = Kaggle::Client.new(options)
   datasets = client.list_datasets(search: ARGV[1])
-  puts JSON.pretty_generate(datasets)
+  puts Oj.dump(datasets, mode: :compat, indent: 2)
   
 when 'download'
   unless ARGV[1] && ARGV[2]
@@ -62,7 +62,7 @@ when 'download'
   
   if options[:parse_csv]
     puts "Parsed data:"
-    puts JSON.pretty_generate(result.first(5)) # Show first 5 rows
+    puts Oj.dump(result.first(5), mode: :compat, indent: 2) # Show first 5 rows
     puts "... (showing first 5 rows of #{result.length} total)"
   else
     puts "Downloaded to: #{result}"
@@ -76,7 +76,7 @@ when 'files'
   
   client = Kaggle::Client.new(options)
   files = client.dataset_files(ARGV[1], ARGV[2])
-  puts JSON.pretty_generate(files)
+  puts Oj.dump(files, mode: :compat, indent: 2)
   
 else
   puts "Available commands: list, download, files"

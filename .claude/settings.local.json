@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Read(//Users/trex22/development/url_categorise/**)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(mkdir:*)",
+      "Bash(bundle exec rake:*)"
     ],
     "deny": [],
     "ask": []

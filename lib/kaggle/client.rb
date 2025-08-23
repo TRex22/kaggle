@@ -13,7 +13,7 @@ module Kaggle
       @cache_path = cache_path || Constants::DEFAULT_CACHE_PATH
       @timeout = timeout || Constants::DEFAULT_TIMEOUT
       
-      raise AuthenticationError, 'Username and API key are required' unless @username && @api_key
+      raise AuthenticationError, 'Username and API key are required' unless valid_credential?(@username) && valid_credential?(@api_key)
       
       ensure_directories_exist
       setup_httparty_options
@@ -52,8 +52,8 @@ module Kaggle
         raise Error, "Failed to list datasets: #{response.message}"
       end
       
-      JSON.parse(response.body)
-    rescue JSON::ParserError => e
+      Oj.load(response.body)
+    rescue Oj::ParseError => e
       raise ParseError, "Failed to parse response: #{e.message}"
     end
     
@@ -65,8 +65,8 @@ module Kaggle
         raise DatasetNotFoundError, "Dataset not found or accessible: #{dataset_path}"
       end
       
-      JSON.parse(response.body)
-    rescue JSON::ParserError => e
+      Oj.load(response.body)
+    rescue Oj::ParseError => e
       raise ParseError, "Failed to parse dataset files response: #{e.message}"
     end
     
@@ -86,6 +86,10 @@ module Kaggle
     
     private
     
+    def valid_credential?(credential)
+      credential && !credential.to_s.strip.empty?
+    end
+    
     def ensure_directories_exist
       FileUtils.mkdir_p(@download_path) unless Dir.exist?(@download_path)
       FileUtils.mkdir_p(@cache_path) unless Dir.exist?(@cache_path)
@@ -104,7 +108,7 @@ module Kaggle
     
     def authenticated_request(method, endpoint, options = {})
       self.class.send(method, endpoint, options)
-    rescue Net::TimeoutError
+    rescue Timeout::Error, Net::ReadTimeout, Net::OpenTimeout
       raise Error, 'Request timed out'
     rescue => e
       raise Error, "Request failed: #{e.message}"
@@ -131,14 +135,14 @@ module Kaggle
     
     def load_from_cache(cache_key)
       cache_file_path = File.join(@cache_path, cache_key)
-      JSON.parse(File.read(cache_file_path))
-    rescue JSON::ParserError => e
+      Oj.load(File.read(cache_file_path))
+    rescue Oj::ParseError => e
       raise ParseError, "Failed to parse cached data: #{e.message}"
     end
     
     def cache_parsed_data(cache_key, data)
       cache_file_path = File.join(@cache_path, cache_key)
-      File.write(cache_file_path, JSON.pretty_generate(data))
+      File.write(cache_file_path, Oj.dump(data, mode: :compat, indent: 2))
     end
     
     def csv_file?(file_path)
