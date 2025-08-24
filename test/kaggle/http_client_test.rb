@@ -87,29 +87,6 @@ class Kaggle::HttpClientTest < Minitest::Test
     assert_includes response.body, 'response'
   end
 
-  def test_list_datasets_with_successful_response
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
-      .to_return(
-        status: 200,
-        body: '{"datasets": [{"name": "test-dataset", "owner": "test-user"}]}',
-        headers: { 'Content-Type' => 'application/json' }
-      )
-
-    result = @client.list_datasets
-    
-    assert_equal({ 'datasets' => [{ 'name' => 'test-dataset', 'owner' => 'test-user' }] }, result)
-  end
-
-  def test_list_datasets_with_http_error
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
-      .to_return(status: 500, body: 'Internal Server Error')
-
-    error = assert_raises(Kaggle::Error) do
-      @client.list_datasets
-    end
-    
-    assert_includes error.message, 'Failed to list datasets'
-  end
 
   def test_dataset_files_with_successful_response
     stub_request(:get, "https://www.kaggle.com/api/v1/datasets/data/owner/dataset")
@@ -136,22 +113,25 @@ class Kaggle::HttpClientTest < Minitest::Test
   end
 
   def test_download_dataset_with_successful_response
+    zip_content = create_test_zip_with_csv
+    
     stub_request(:get, "https://www.kaggle.com/api/v1/datasets/download/owner/dataset")
       .to_return(
         status: 200,
-        body: 'mock zip file content',
+        body: zip_content,
         headers: { 'Content-Type' => 'application/zip' }
       )
 
-    Timecop.freeze(Time.at(1234567890)) do
-      result = @client.download_dataset('owner', 'dataset')
-      
-      assert_kind_of String, result
-      assert_includes result, './downloads'
-      assert_includes result, 'owner_dataset_1234567890.zip'
-      assert File.exist?(result)
-      assert_equal 'mock zip file content', File.read(result)
-    end
+    result = @client.download_dataset('owner', 'dataset')
+    
+    assert_kind_of String, result
+    assert_includes result, './downloads'
+    assert_includes result, 'owner_dataset'
+    assert Dir.exist?(result)
+    
+    # Check that files were extracted
+    csv_files = Dir.glob(File.join(result, '**', '*.csv'))
+    assert csv_files.length > 0
   end
 
   def test_download_dataset_with_http_error
@@ -163,5 +143,31 @@ class Kaggle::HttpClientTest < Minitest::Test
     end
     
     assert_includes error.message, 'Failed to download dataset'
+  end
+
+  private
+
+  def create_test_zip_with_csv
+    # Create a temporary zip file with CSV content
+    csv_content = "name,age,city\nJohn,30,NYC\nJane,25,LA"
+    
+    # Create a temporary file to write zip content to
+    temp_file = Tempfile.new(['test', '.zip'])
+    temp_file.binmode
+    
+    begin
+      Zip::OutputStream.open(temp_file) do |zos|
+        zos.put_next_entry("test_data.csv")
+        zos.write csv_content
+      end
+      
+      temp_file.rewind
+      content = temp_file.read
+    ensure
+      temp_file.close
+      temp_file.unlink
+    end
+    
+    content
   end
 end

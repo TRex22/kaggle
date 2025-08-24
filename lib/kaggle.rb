@@ -4,6 +4,7 @@ require 'oj'
 require 'fileutils'
 require 'net/http'
 require 'timeout'
+require 'zip'
 
 require_relative 'kaggle/version'
 require_relative 'kaggle/constants'

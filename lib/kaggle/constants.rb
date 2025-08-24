@@ -4,13 +4,12 @@ module Kaggle
     
     DEFAULT_DOWNLOAD_PATH = './downloads'
     DEFAULT_CACHE_PATH = './cache'
-    DEFAULT_PAGE_SIZE = 20
+    DEFAULT_CREDENTIALS_FILE = './kaggle.json'
     DEFAULT_TIMEOUT = 30
     
     SUPPORTED_FORMATS = %w[csv json].freeze
     
     DATASET_ENDPOINTS = {
-      list: '/datasets/list',
       view: '/datasets/view',
       download: '/datasets/download',
       files: '/datasets/data'

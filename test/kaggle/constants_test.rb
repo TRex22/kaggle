@@ -11,7 +11,6 @@ class Kaggle::ConstantsTest < Minitest::Test
   end
 
   def test_default_values_are_reasonable
-    assert_equal 20, Kaggle::Constants::DEFAULT_PAGE_SIZE
     assert_equal 30, Kaggle::Constants::DEFAULT_TIMEOUT
   end
 
@@ -24,7 +23,6 @@ class Kaggle::ConstantsTest < Minitest::Test
   def test_dataset_endpoints_are_defined
     endpoints = Kaggle::Constants::DATASET_ENDPOINTS
     
-    assert_equal '/datasets/list', endpoints[:list]
     assert_equal '/datasets/view', endpoints[:view]
     assert_equal '/datasets/download', endpoints[:download]
     assert_equal '/datasets/data', endpoints[:files]

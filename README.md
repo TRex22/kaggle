@@ -30,18 +30,30 @@ Or install it yourself as:
 
 ## Setup
 
-You'll need Kaggle API credentials to use this gem:
+You'll need Kaggle API credentials to use this gem. There are three ways to authenticate:
 
+### Option 1: JSON File (Recommended)
 1. Go to your [Kaggle account page](https://www.kaggle.com/account)
 2. Click "Create New API Token" to download `kaggle.json`
-3. Set environment variables:
+3. Place the file in your project directory or specify the path
 
+### Option 2: Environment Variables
 ```bash
 export KAGGLE_USERNAME="yourusername"
 export KAGGLE_KEY="your_api_key"
 ```
 
-Or pass credentials directly when initializing the client.
+### Option 3: Direct Credentials
+Pass credentials directly when initializing the client.
+
+### Kaggle JSON File Format
+The `kaggle.json` file downloaded from Kaggle should have this format:
+```json
+{
+  "username": "yourusername",
+  "key": "your_api_key"
+}
+```
 
 ## Usage
 
@@ -50,10 +62,16 @@ Or pass credentials directly when initializing the client.
 ```ruby
 require 'kaggle'
 
-# Initialize client with environment variables
+# Option 1: Use kaggle.json file (automatically detected)
 client = Kaggle::Client.new
 
-# Or initialize with explicit credentials
+# Option 1b: Use custom JSON file path
+client = Kaggle::Client.new(credentials_file: '/path/to/kaggle.json')
+
+# Option 2: Use environment variables
+client = Kaggle::Client.new
+
+# Option 3: Use explicit credentials
 client = Kaggle::Client.new(
   username: 'your_username',
   api_key: 'your_api_key'
@@ -92,6 +110,7 @@ data = client.download_dataset('zillow', 'zecon',
 
 ```ruby
 client = Kaggle::Client.new(
+  credentials_file: '/path/to/kaggle.json',
   download_path: '/custom/downloads',
   cache_path: '/custom/cache'
 )
@@ -124,6 +143,9 @@ kaggle download zillow zecon
 # Download and parse CSV
 kaggle download zillow zecon --parse-csv
 
+# Use custom credentials file
+kaggle download zillow zecon --credentials-file /path/to/kaggle.json
+
 # Use custom paths
 kaggle download zillow zecon --download-path /custom --cache-path /custom/cache
 
@@ -138,6 +160,7 @@ kaggle --version
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `credentials_file` | `./kaggle.json` | Path to Kaggle credentials JSON file |
 | `download_path` | `./downloads` | Where to save downloaded files |
 | `cache_path` | `./cache` | Where to cache parsed data |
 | `timeout` | `30` | HTTP request timeout in seconds |

@@ -4,7 +4,8 @@
       "Read(//Users/trex22/development/url_categorise/**)",
       "Bash(chmod:*)",
       "Bash(mkdir:*)",
-      "Bash(bundle exec rake:*)"
+      "Bash(bundle exec rake:*)",
+      "Bash(rake test)"
     ],
     "deny": [],
     "ask": []

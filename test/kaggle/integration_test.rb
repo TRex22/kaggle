@@ -21,39 +21,33 @@ class Kaggle::IntegrationTest < Minitest::Test
   end
 
   def test_complete_dataset_workflow_with_caching
-    dataset_path = 'test-owner/test-dataset'
-    csv_content = "name,age,city\nJohn,30,NYC\nJane,25,LA"
+    dataset_owner = 'test-owner'
+    dataset_name = 'test-dataset'
+    zip_content = create_test_zip_with_csv
     
     expected_data = [
       { 'name' => 'John', 'age' => '30', 'city' => 'NYC' },
       { 'name' => 'Jane', 'age' => '25', 'city' => 'LA' }
     ]
     
-    # Test cache functionality directly
-    cache_key = @client.send(:generate_cache_key, dataset_path)
+    # Mock the download request
+    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/download/#{dataset_owner}/#{dataset_name}")
+      .to_return(status: 200, body: zip_content, headers: { 'Content-Type' => 'application/zip' })
     
-    # Initially no cache should exist
-    refute @client.send(:cached_file_exists?, cache_key)
+    # First download - should make HTTP request and cache the result
+    result1 = @client.download_dataset(dataset_owner, dataset_name, use_cache: true, parse_csv: true)
+    assert_equal expected_data, result1
     
-    # Cache some data
-    @client.send(:cache_parsed_data, cache_key, expected_data)
+    # Second download - should use cache (no HTTP request needed)
+    WebMock.reset! # Clear stubs to ensure no HTTP request is made
+    result2 = @client.download_dataset(dataset_owner, dataset_name, use_cache: true, parse_csv: true)
+    assert_equal expected_data, result2
     
-    # Verify cache file was created
-    assert @client.send(:cached_file_exists?, cache_key)
-    
-    # Load from cache
-    cached_result = @client.send(:load_from_cache, cache_key)
-    assert_equal expected_data, cached_result
+    # Verify both results are identical
+    assert_equal result1, result2
   end
 
-  def test_dataset_listing_and_file_inspection_workflow
-    # Mock dataset list API
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
-      .to_return(
-        status: 200,
-        body: '{"datasets":[{"name":"housing-data","owner":"realestate","description":"Housing price data"},{"name":"stock-prices","owner":"finance","description":"Stock market data"}]}'
-      )
-    
+  def test_dataset_file_inspection_workflow
     # Mock dataset files API
     stub_request(:get, "https://www.kaggle.com/api/v1/datasets/data/realestate/housing-data")
       .to_return(
@@ -61,14 +55,7 @@ class Kaggle::IntegrationTest < Minitest::Test
         body: '{"files":[{"name":"train.csv","size":1048576},{"name":"test.csv","size":524288},{"name":"README.md","size":2048}]}'
       )
     
-    # Test workflow: list datasets, then inspect specific dataset
-    datasets = @client.list_datasets
-    refute_nil datasets, "Datasets response should not be nil"
-    refute_nil datasets['datasets'], "Datasets array should not be nil"
-    assert_equal 2, datasets['datasets'].length
-    assert_equal 'housing-data', datasets['datasets'][0]['name']
-    
-    # Inspect files for the first dataset
+    # Inspect files for a dataset
     files = @client.dataset_files('realestate', 'housing-data')
     assert_equal 3, files['files'].length
     assert_equal 'train.csv', files['files'][0]['name']
@@ -100,35 +87,6 @@ class Kaggle::IntegrationTest < Minitest::Test
     assert_includes download_error.message, 'Failed to download dataset'
   end
 
-  def test_search_and_pagination_workflow
-    # Test search functionality
-    search_term = 'finance'
-    
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&search=#{search_term}&size=10")
-      .to_return(
-        status: 200,
-        body: '{"datasets":[{"name":"stock-data","owner":"finance-corp"},{"name":"crypto-prices","owner":"blockchain-data"}],"pagination":{"page":1,"total_pages":3,"total_count":25}}'
-      )
-    
-    # Test pagination
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=2&size=10")
-      .to_return(
-        status: 200,
-        body: '{"datasets":[{"name":"housing-market","owner":"real-estate"}],"pagination":{"page":2,"total_pages":3,"total_count":25}}'
-      )
-    
-    # Search for finance-related datasets
-    search_results = @client.list_datasets(search: search_term, page_size: 10)
-    refute_nil search_results, "Search results should not be nil"
-    refute_nil search_results['datasets'], "Search results datasets array should not be nil"
-    assert_equal 2, search_results['datasets'].length
-    assert_equal 'stock-data', search_results['datasets'][0]['name']
-    
-    # Get second page
-    page2_results = @client.list_datasets(page: 2, page_size: 10)
-    assert_equal 1, page2_results['datasets'].length
-    assert_equal 'housing-market', page2_results['datasets'][0]['name']
-  end
 
   def test_file_format_detection_and_parsing_workflow
     # Create various file types to test detection
@@ -184,5 +142,29 @@ class Kaggle::IntegrationTest < Minitest::Test
     file_path = File.join(@temp_download_dir, filename)
     File.write(file_path, content)
     file_path
+  end
+
+  def create_test_zip_with_csv
+    # Create a temporary zip file with CSV content
+    csv_content = "name,age,city\nJohn,30,NYC\nJane,25,LA"
+    
+    # Create a temporary file to write zip content to
+    temp_file = Tempfile.new(['test', '.zip'])
+    temp_file.binmode
+    
+    begin
+      Zip::OutputStream.open(temp_file) do |zos|
+        zos.put_next_entry("test_data.csv")
+        zos.write csv_content
+      end
+      
+      temp_file.rewind
+      content = temp_file.read
+    ensure
+      temp_file.close
+      temp_file.unlink
+    end
+    
+    content
   end
 end

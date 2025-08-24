@@ -6,6 +6,7 @@ PATH
       fileutils (>= 1.7)
       httparty (>= 0.23)
       oj (= 3.16.11)
+      rubyzip (>= 2.0)
 
 GEM
   remote: https://rubygems.org/
@@ -53,6 +54,7 @@ GEM
     rexml (3.4.1)
     ruby-progressbar (1.13.0)
     ruby2_keywords (0.0.5)
+    rubyzip (3.0.1)
     simplecov (0.22.0)
       docile (~> 1.1)
       simplecov-html (~> 0.11)

@@ -6,9 +6,8 @@ module Kaggle
     
     attr_reader :username, :api_key, :download_path, :cache_path, :timeout
     
-    def initialize(username: nil, api_key: nil, download_path: nil, cache_path: nil, timeout: nil)
-      @username = username || ENV['KAGGLE_USERNAME']
-      @api_key = api_key || ENV['KAGGLE_KEY']
+    def initialize(username: nil, api_key: nil, credentials_file: nil, download_path: nil, cache_path: nil, timeout: nil)
+      load_credentials(username, api_key, credentials_file)
       @download_path = download_path || Constants::DEFAULT_DOWNLOAD_PATH
       @cache_path = cache_path || Constants::DEFAULT_CACHE_PATH
       @timeout = timeout || Constants::DEFAULT_TIMEOUT
@@ -21,41 +20,49 @@ module Kaggle
     
     def download_dataset(dataset_owner, dataset_name, options = {})
       dataset_path = "#{dataset_owner}/#{dataset_name}"
-      cache_key = generate_cache_key(dataset_path)
       
-      if options[:use_cache] && cached_file_exists?(cache_key)
-        return load_from_cache(cache_key)
+      # Check cache first for parsed data
+      if options[:use_cache] && options[:parse_csv]
+        cache_key = generate_cache_key(dataset_path)
+        if cached_file_exists?(cache_key)
+          return load_from_cache(cache_key)
+        end
       end
       
+      # Check if we already have extracted files for this dataset
+      extracted_dir = get_extracted_dir(dataset_path)
+      if options[:use_cache] && Dir.exist?(extracted_dir) && !Dir.empty?(extracted_dir)
+        return handle_existing_dataset(extracted_dir, options)
+      end
+      
+      # Download the zip file
       response = authenticated_request(:get, "#{Constants::DATASET_ENDPOINTS[:download]}/#{dataset_path}")
       
       unless response.success?
         raise DownloadError, "Failed to download dataset: #{response.message}"
       end
       
-      downloaded_file = save_downloaded_file(dataset_path, response.body)
+      # Save zip file
+      zip_file = save_zip_file(dataset_path, response.body)
       
-      if options[:parse_csv] && csv_file?(downloaded_file)
-        parsed_data = parse_csv_to_json(downloaded_file)
-        cache_parsed_data(cache_key, parsed_data) if options[:use_cache]
-        return parsed_data
+      # Extract zip file
+      extract_zip_file(zip_file, extracted_dir)
+      
+      # Clean up zip file
+      File.delete(zip_file) if File.exist?(zip_file)
+      
+      # Handle the extracted files
+      result = handle_extracted_dataset(extracted_dir, options)
+      
+      # Cache parsed CSV data if requested
+      if options[:use_cache] && options[:parse_csv] && (result.is_a?(Hash) || result.is_a?(Array))
+        cache_key = generate_cache_key(dataset_path)
+        cache_parsed_data(cache_key, result)
       end
       
-      downloaded_file
+      result
     end
     
-    def list_datasets(options = {})
-      params = build_list_params(options)
-      response = authenticated_request(:get, Constants::DATASET_ENDPOINTS[:list], query: params)
-      
-      unless response.success?
-        raise Error, "Failed to list datasets: #{response.message}"
-      end
-      
-      Oj.load(response.body)
-    rescue Oj::ParseError => e
-      raise ParseError, "Failed to parse response: #{e.message}"
-    end
     
     def dataset_files(dataset_owner, dataset_name)
       dataset_path = "#{dataset_owner}/#{dataset_name}"
@@ -90,6 +97,33 @@ module Kaggle
       credential && !credential.to_s.strip.empty?
     end
     
+    def load_credentials(username, api_key, credentials_file)
+      # Try provided credentials file first
+      if credentials_file && File.exist?(credentials_file)
+        credentials = load_credentials_from_file(credentials_file)
+        @username = username || credentials['username']
+        @api_key = api_key || credentials['key']
+      # Try default kaggle.json file if no explicit credentials
+      elsif !username && !api_key && File.exist?(Constants::DEFAULT_CREDENTIALS_FILE)
+        credentials = load_credentials_from_file(Constants::DEFAULT_CREDENTIALS_FILE)
+        @username = credentials['username']
+        @api_key = credentials['key']
+      else
+        # Fall back to environment variables
+        @username = username || ENV['KAGGLE_USERNAME']
+        @api_key = api_key || ENV['KAGGLE_KEY']
+      end
+    end
+    
+    def load_credentials_from_file(file_path)
+      content = File.read(file_path)
+      Oj.load(content)
+    rescue Oj::ParseError => e
+      raise AuthenticationError, "Invalid credentials file format: #{e.message}"
+    rescue => e
+      raise AuthenticationError, "Failed to read credentials file: #{e.message}"
+    end
+    
     def ensure_directories_exist
       FileUtils.mkdir_p(@download_path) unless Dir.exist?(@download_path)
       FileUtils.mkdir_p(@cache_path) unless Dir.exist?(@cache_path)
@@ -114,8 +148,13 @@ module Kaggle
       raise Error, "Request failed: #{e.message}"
     end
     
-    def save_downloaded_file(dataset_path, content)
-      filename = "#{dataset_path.gsub('/', '_')}_#{Time.now.to_i}.zip"
+    def get_extracted_dir(dataset_path)
+      dir_name = dataset_path.gsub('/', '_')
+      File.join(@download_path, dir_name)
+    end
+    
+    def save_zip_file(dataset_path, content)
+      filename = "#{dataset_path.gsub('/', '_')}.zip"
       file_path = File.join(@download_path, filename)
       
       File.open(file_path, 'wb') do |file|
@@ -123,6 +162,69 @@ module Kaggle
       end
       
       file_path
+    end
+    
+    def extract_zip_file(zip_file_path, extract_to_dir)
+      FileUtils.mkdir_p(extract_to_dir)
+      
+      Zip::File.open(zip_file_path) do |zip_file|
+        zip_file.each do |entry|
+          extract_path = File.join(extract_to_dir, entry.name)
+          
+          if entry.directory?
+            # Create directory
+            FileUtils.mkdir_p(extract_path)
+          else
+            # Create parent directory if it doesn't exist
+            parent_dir = File.dirname(extract_path)
+            FileUtils.mkdir_p(parent_dir) unless Dir.exist?(parent_dir)
+            
+            # Extract file manually to avoid path issues
+            File.open(extract_path, 'wb') do |f|
+              f.write entry.get_input_stream.read
+            end
+          end
+        end
+      end
+    rescue Zip::Error => e
+      raise DownloadError, "Failed to extract zip file: #{e.message}"
+    end
+    
+    def handle_existing_dataset(extracted_dir, options)
+      if options[:parse_csv]
+        csv_files = find_csv_files(extracted_dir)
+        return parse_csv_files_to_json(csv_files) unless csv_files.empty?
+      end
+      
+      extracted_dir
+    end
+    
+    def handle_extracted_dataset(extracted_dir, options)
+      if options[:parse_csv]
+        csv_files = find_csv_files(extracted_dir)
+        unless csv_files.empty?
+          parsed_data = parse_csv_files_to_json(csv_files)
+          return parsed_data
+        end
+      end
+      
+      extracted_dir
+    end
+    
+    def find_csv_files(directory)
+      Dir.glob(File.join(directory, '**', '*.csv'))
+    end
+    
+    def parse_csv_files_to_json(csv_files)
+      result = {}
+      
+      csv_files.each do |csv_file|
+        file_name = File.basename(csv_file, '.csv')
+        result[file_name] = parse_csv_to_json(csv_file)
+      end
+      
+      # If there's only one CSV file, return its data directly
+      result.length == 1 ? result.values.first : result
     end
     
     def generate_cache_key(dataset_path)
@@ -149,13 +251,5 @@ module Kaggle
       File.extname(file_path).downcase == '.csv'
     end
     
-    def build_list_params(options)
-      {
-        page: options[:page] || 1,
-        search: options[:search],
-        sortBy: options[:sort_by],
-        size: options[:page_size] || Constants::DEFAULT_PAGE_SIZE
-      }.compact
-    end
   end
 end

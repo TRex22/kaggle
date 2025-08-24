@@ -16,6 +16,10 @@ OptionParser.new do |opts|
     options[:api_key] = key
   end
   
+  opts.on("-f", "--credentials-file PATH", "Kaggle credentials JSON file (default: ./kaggle.json)") do |path|
+    options[:credentials_file] = path
+  end
+  
   opts.on("-d", "--download-path PATH", "Download path (default: ./downloads)") do |path|
     options[:download_path] = path
   end
@@ -46,11 +50,6 @@ end.parse!
 command = ARGV[0]
 
 case command
-when 'list'
-  client = Kaggle::Client.new(options)
-  datasets = client.list_datasets(search: ARGV[1])
-  puts Oj.dump(datasets, mode: :compat, indent: 2)
-  
 when 'download'
   unless ARGV[1] && ARGV[2]
     puts "Usage: kaggle download OWNER DATASET"
@@ -79,6 +78,6 @@ when 'files'
   puts Oj.dump(files, mode: :compat, indent: 2)
   
 else
-  puts "Available commands: list, download, files"
+  puts "Available commands: download, files"
   puts "Use 'kaggle --help' for more information"
 end

@@ -27,34 +27,6 @@ class Kaggle::ClientErrorHandlingTest < Minitest::Test
     assert_includes error.message, 'Request failed: Connection failed'
   end
 
-  def test_build_list_params_filters_nil_values
-    options = {
-      page: 2,
-      search: 'housing',
-      sort_by: nil,
-      page_size: 10
-    }
-    
-    result = @client.send(:build_list_params, options)
-    expected = {
-      page: 2,
-      search: 'housing',
-      sortBy: nil,
-      size: 10
-    }.compact
-    
-    assert_equal expected, result
-    refute_includes result.keys, :sortBy
-  end
-
-  def test_build_list_params_uses_defaults
-    result = @client.send(:build_list_params, {})
-    
-    assert_equal 1, result[:page]
-    assert_equal 20, result[:size]
-    refute_includes result.keys, :search
-    refute_includes result.keys, :sortBy
-  end
 
   def test_csv_file_detection_is_case_insensitive
     assert @client.send(:csv_file?, 'test.csv')
@@ -66,14 +38,6 @@ class Kaggle::ClientErrorHandlingTest < Minitest::Test
     refute @client.send(:csv_file?, 'test')
   end
 
-  def test_list_datasets_with_json_parse_error
-    stub_request(:get, "https://www.kaggle.com/api/v1/datasets/list?page=1&size=20")
-      .to_return(status: 200, body: 'invalid json')
-
-    assert_raises(Kaggle::ParseError) do
-      @client.list_datasets
-    end
-  end
 
   def test_dataset_files_with_json_parse_error
     stub_request(:get, "https://www.kaggle.com/api/v1/datasets/data/owner/dataset")
