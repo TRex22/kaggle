@@ -22,7 +22,7 @@ class Kaggle::ConstantsTest < Minitest::Test
 
   def test_dataset_endpoints_are_defined
     endpoints = Kaggle::Constants::DATASET_ENDPOINTS
-    
+
     assert_equal '/datasets/view', endpoints[:view]
     assert_equal '/datasets/download', endpoints[:download]
     assert_equal '/datasets/data', endpoints[:files]
@@ -30,7 +30,7 @@ class Kaggle::ConstantsTest < Minitest::Test
 
   def test_required_headers_are_set
     headers = Kaggle::Constants::REQUIRED_HEADERS
-    
+
     assert_equal 'Kaggle Ruby Client/0.0.1', headers['User-Agent']
     assert_equal 'application/json', headers['Accept']
   end

@@ -28,19 +28,19 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'httparty', '>= 0.23'
   spec.add_dependency 'csv', '>= 3.3'
-  spec.add_dependency 'oj', '3.16.11'
   spec.add_dependency 'fileutils', '>= 1.7'
+  spec.add_dependency 'httparty', '>= 0.23'
+  spec.add_dependency 'oj', '3.16.11'
   spec.add_dependency 'rubyzip', '>= 2.0'
 
-  spec.add_development_dependency 'rake', '~> 13.3.0'
   spec.add_development_dependency 'minitest', '~> 5.25.5'
   spec.add_development_dependency 'minitest-focus', '~> 1.4.0'
   spec.add_development_dependency 'minitest-reporters', '~> 1.7.1'
-  spec.add_development_dependency 'webmock', '~> 3.24.0'
   spec.add_development_dependency 'mocha', '~> 2.4.5'
   spec.add_development_dependency 'pry', '~> 0.15.2'
+  spec.add_development_dependency 'rake', '~> 13.3.0'
   spec.add_development_dependency 'simplecov', '~> 0.22.0'
   spec.add_development_dependency 'timecop', '~> 0.9.10'
+  spec.add_development_dependency 'webmock', '~> 3.24.0'
 end

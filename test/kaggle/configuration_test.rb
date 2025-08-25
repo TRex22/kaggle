@@ -10,7 +10,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
   def test_initialization_with_all_custom_parameters
     temp_download_dir = Dir.mktmpdir
     temp_cache_dir = Dir.mktmpdir
-    
+
     custom_config = {
       username: 'custom_user',
       api_key: 'custom_key',
@@ -18,9 +18,9 @@ class Kaggle::ConfigurationTest < Minitest::Test
       cache_path: temp_cache_dir,
       timeout: 60
     }
-    
+
     client = Kaggle::Client.new(**custom_config)
-    
+
     assert_equal 'custom_user', client.username
     assert_equal 'custom_key', client.api_key
     assert_equal temp_download_dir, client.download_path
@@ -34,19 +34,19 @@ class Kaggle::ConfigurationTest < Minitest::Test
   def test_initialization_mixed_explicit_and_env_variables
     ENV['KAGGLE_USERNAME'] = 'env_username'
     ENV['KAGGLE_KEY'] = 'env_key'
-    
+
     temp_dir = Dir.mktmpdir
-    
+
     # Explicit parameters should override environment variables
     client = Kaggle::Client.new(
       username: 'explicit_user',
       download_path: temp_dir
     )
-    
+
     assert_equal 'explicit_user', client.username
-    assert_equal 'env_key', client.api_key  # From environment
+    assert_equal 'env_key', client.api_key # From environment
     assert_equal temp_dir, client.download_path
-    assert_equal './cache', client.cache_path  # Default
+    assert_equal './cache', client.cache_path # Default
   ensure
     FileUtils.rm_rf(temp_dir) if temp_dir && Dir.exist?(temp_dir)
   end
@@ -55,7 +55,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
     error = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new(username: nil, api_key: nil)
     end
-    
+
     assert_equal 'Username and API key are required', error.message
   end
 
@@ -63,7 +63,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
     error = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new(username: '', api_key: '')
     end
-    
+
     assert_equal 'Username and API key are required', error.message
   end
 
@@ -71,19 +71,19 @@ class Kaggle::ConfigurationTest < Minitest::Test
     error = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new(username: 'user_only')
     end
-    
+
     assert_equal 'Username and API key are required', error.message
-    
+
     error2 = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new(api_key: 'key_only')
     end
-    
+
     assert_equal 'Username and API key are required', error2.message
   end
 
   def test_default_values_are_applied_correctly
     client = Kaggle::Client.new(username: 'test', api_key: 'test')
-    
+
     assert_equal Kaggle::Constants::DEFAULT_DOWNLOAD_PATH, client.download_path
     assert_equal Kaggle::Constants::DEFAULT_CACHE_PATH, client.cache_path
     assert_equal Kaggle::Constants::DEFAULT_TIMEOUT, client.timeout
@@ -96,7 +96,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
       download_path: './my_downloads',
       cache_path: '../shared_cache'
     )
-    
+
     assert_equal './my_downloads', client.download_path
     assert_equal '../shared_cache', client.cache_path
   end
@@ -104,20 +104,20 @@ class Kaggle::ConfigurationTest < Minitest::Test
   def test_directory_creation_is_called_during_initialization
     temp_download_dir = File.join(Dir.tmpdir, 'test_download')
     temp_cache_dir = File.join(Dir.tmpdir, 'test_cache')
-    
+
     # Ensure directories don't exist
     FileUtils.rm_rf([temp_download_dir, temp_cache_dir])
-    
+
     FileUtils.expects(:mkdir_p).with(temp_download_dir).once
     FileUtils.expects(:mkdir_p).with(temp_cache_dir).once
-    
+
     client = Kaggle::Client.new(
       username: 'test',
       api_key: 'test',
       download_path: temp_download_dir,
       cache_path: temp_cache_dir
     )
-    
+
     assert_equal temp_download_dir, client.download_path
     assert_equal temp_cache_dir, client.cache_path
   end
@@ -129,7 +129,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
         api_key: 'test',
         timeout: timeout_value
       )
-      
+
       assert_equal timeout_value, client.timeout
     end
   end
@@ -138,9 +138,9 @@ class Kaggle::ConfigurationTest < Minitest::Test
     # Environment variables should be used when explicit params not provided
     ENV['KAGGLE_USERNAME'] = 'env_user'
     ENV['KAGGLE_KEY'] = 'env_key'
-    
+
     client = Kaggle::Client.new
-    
+
     assert_equal 'env_user', client.username
     assert_equal 'env_key', client.api_key
   end
@@ -148,11 +148,11 @@ class Kaggle::ConfigurationTest < Minitest::Test
   def test_empty_environment_variables_treated_as_missing
     ENV['KAGGLE_USERNAME'] = ''
     ENV['KAGGLE_KEY'] = ''
-    
+
     error = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new
     end
-    
+
     assert_equal 'Username and API key are required', error.message
   end
 end

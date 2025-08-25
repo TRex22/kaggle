@@ -78,19 +78,6 @@ client = Kaggle::Client.new(
 )
 ```
 
-### List Datasets
-
-```ruby
-# List all datasets
-datasets = client.list_datasets
-
-# Search datasets
-datasets = client.list_datasets(search: 'housing')
-
-# Paginate results
-datasets = client.list_datasets(page: 2, page_size: 10)
-```
-
 ### Download Datasets
 
 ```ruby
@@ -131,12 +118,6 @@ data = client.parse_csv_to_json('/path/to/file.csv')
 The gem includes a command-line interface:
 
 ```bash
-# List datasets
-kaggle list
-
-# Search datasets
-kaggle list "housing"
-
 # Download dataset
 kaggle download zillow zecon
 
