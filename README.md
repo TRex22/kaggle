@@ -8,6 +8,7 @@ This is an unofficial project and still a work in progress (WIP) ... more to com
 - 📊 Download Kaggle datasets programmatically
 - 📄 Parse CSV datasets to JSON format
 - 💾 Configurable caching to avoid re-downloading
+- 🔐 Cache-only mode for accessing datasets without credentials
 - 🔧 Flexible download and cache paths
 - ⚡ Built-in error handling and validation
 - 🛠️ Command-line interface for quick operations
@@ -46,6 +47,9 @@ export KAGGLE_KEY="your_api_key"
 ### Option 3: Direct Credentials
 Pass credentials directly when initializing the client.
 
+### Option 4: Cache-Only Mode
+Access only cached datasets without providing credentials (useful for offline access or when credentials are unavailable).
+
 ### Kaggle JSON File Format
 The `kaggle.json` file downloaded from Kaggle should have this format:
 ```json
@@ -76,6 +80,40 @@ client = Kaggle::Client.new(
   username: 'your_username',
   api_key: 'your_api_key'
 )
+
+# Option 4: Cache-only mode (no credentials needed)
+client = Kaggle::Client.new(cache_only: true)
+```
+
+### Cache-Only Mode
+
+Cache-only mode allows you to access previously downloaded and cached datasets without requiring valid Kaggle credentials. This is useful for:
+
+- Offline development environments
+- CI/CD pipelines where credentials aren't available
+- Production systems that should only use pre-cached data
+
+```ruby
+# Initialize in cache-only mode
+client = Kaggle::Client.new(
+  cache_only: true,
+  cache_path: '/path/to/cache'
+)
+
+# This will return cached data if available, nil if not cached
+data = client.download_dataset('zillow', 'zecon', 
+                              parse_csv: true, 
+                              use_cache: true)
+
+# Force cache mode - raises CacheNotFoundError if not cached
+begin
+  data = client.download_dataset('zillow', 'zecon', 
+                                parse_csv: true, 
+                                use_cache: true,
+                                force_cache: true)
+rescue Kaggle::CacheNotFoundError
+  puts "Dataset not found in cache"
+end
 ```
 
 ### Download Datasets
@@ -145,8 +183,10 @@ kaggle --version
 | `download_path` | `./downloads` | Where to save downloaded files |
 | `cache_path` | `./cache` | Where to cache parsed data |
 | `timeout` | `30` | HTTP request timeout in seconds |
+| `cache_only` | `false` | Enable cache-only mode (no credentials required) |
 | `use_cache` | `false` | Use cached parsed data when available |
 | `parse_csv` | `false` | Automatically parse CSV files to JSON |
+| `force_cache` | `false` | Raise error if cached data not found (cache-only mode) |
 
 ## Error Handling
 
@@ -163,6 +203,8 @@ rescue Kaggle::DownloadError
   puts "Download failed"
 rescue Kaggle::ParseError
   puts "Failed to parse data"
+rescue Kaggle::CacheNotFoundError
+  puts "Dataset not found in cache (cache-only mode)"
 end
 ```
 

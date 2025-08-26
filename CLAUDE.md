@@ -6,6 +6,15 @@ This file documents how Claude helped develop this Ruby gem and provides guidanc
 
 This Kaggle Ruby gem was created with assistance from Claude (Sonnet 4) on 2025-08-23. The development process followed established Ruby gem conventions and best practices.
 
+### Version 0.0.3 Updates (2025-08-26)
+- **Added cache-only mode**: New `cache_only: true` initialization option
+- **Enhanced error handling**: Added `CacheNotFoundError` for cache-only scenarios
+- **Flexible cache behavior**: Support for graceful degradation vs strict cache requirements
+- **Comprehensive testing**: Added 6 new test cases for cache-only functionality
+- **Updated documentation**: README and CLAUDE.md updated with new features
+
+This update enables offline usage and integration with systems where credentials aren't available but cached data exists.
+
 ## Architecture Decisions
 
 ### 1. Gem Structure
@@ -31,14 +40,18 @@ This Kaggle Ruby gem was created with assistance from Claude (Sonnet 4) on 2025-
 ## Key Implementation Notes
 
 ### Authentication
-The gem supports two authentication methods:
-1. Environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`)
-2. Explicit parameters during client initialization
+The gem supports multiple authentication methods:
+1. JSON credentials file (`kaggle.json`) - automatic detection or custom path
+2. Environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`)
+3. Explicit parameters during client initialization
+4. **Cache-only mode** - no credentials required, access cached data only
 
 ### Caching Strategy
 - Simple file-based caching for parsed CSV data
 - Cache keys generated from dataset paths
 - Optional cache usage controlled by method parameters
+- **Cache-only mode** allows accessing datasets without valid credentials
+- Support for both graceful degradation (return nil) and strict mode (raise error)
 
 ### CSV Parsing
 - Uses Ruby's built-in CSV library for reliability
