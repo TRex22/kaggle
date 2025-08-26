@@ -4,22 +4,23 @@ module Kaggle
 
     base_uri Constants::BASE_URL
 
-    attr_reader :username, :api_key, :download_path, :cache_path, :timeout
+    attr_reader :username, :api_key, :download_path, :cache_path, :timeout, :cache_only
 
     def initialize(username: nil, api_key: nil, credentials_file: nil, download_path: nil, cache_path: nil,
-                   timeout: nil)
+                   timeout: nil, cache_only: false)
       load_credentials(username, api_key, credentials_file)
       @download_path = download_path || Constants::DEFAULT_DOWNLOAD_PATH
       @cache_path = cache_path || Constants::DEFAULT_CACHE_PATH
       @timeout = timeout || Constants::DEFAULT_TIMEOUT
+      @cache_only = cache_only
 
-      unless valid_credential?(@username) && valid_credential?(@api_key)
+      unless cache_only || (valid_credential?(@username) && valid_credential?(@api_key))
         raise AuthenticationError,
-              'Username and API key are required'
+              'Username and API key are required (or set cache_only: true for cache-only access)'
       end
 
       ensure_directories_exist
-      setup_httparty_options
+      setup_httparty_options unless cache_only
     end
 
     def download_dataset(dataset_owner, dataset_name, options = {})
@@ -35,6 +36,15 @@ module Kaggle
       extracted_dir = get_extracted_dir(dataset_path)
       if options[:use_cache] && Dir.exist?(extracted_dir) && !Dir.empty?(extracted_dir)
         return handle_existing_dataset(extracted_dir, options)
+      end
+
+      # If cache_only mode and no cached data found, return nil or raise based on force_cache option
+      if @cache_only
+        if options[:force_cache]
+          raise CacheNotFoundError, "Dataset '#{dataset_path}' not found in cache and force_cache is enabled"
+        else
+          return nil # Gracefully return nil when cache_only but not forced
+        end
       end
 
       # Download the zip file

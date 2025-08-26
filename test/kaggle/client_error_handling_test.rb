@@ -72,7 +72,7 @@ class Kaggle::ClientErrorHandlingTest < Minitest::Test
       Kaggle::Client.new
     end
 
-    assert_equal 'Username and API key are required', error.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error.message
   end
 
   def test_initialization_creates_directories

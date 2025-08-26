@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    kaggle (0.0.2)
+    kaggle (0.0.3)
       csv (>= 3.3)
       fileutils (>= 1.7)
       httparty (>= 0.23)

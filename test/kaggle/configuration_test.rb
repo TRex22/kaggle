@@ -56,7 +56,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
       Kaggle::Client.new(username: nil, api_key: nil)
     end
 
-    assert_equal 'Username and API key are required', error.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error.message
   end
 
   def test_initialization_validates_required_credentials_with_empty_strings
@@ -64,7 +64,7 @@ class Kaggle::ConfigurationTest < Minitest::Test
       Kaggle::Client.new(username: '', api_key: '')
     end
 
-    assert_equal 'Username and API key are required', error.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error.message
   end
 
   def test_initialization_validates_partial_credentials
@@ -72,13 +72,13 @@ class Kaggle::ConfigurationTest < Minitest::Test
       Kaggle::Client.new(username: 'user_only')
     end
 
-    assert_equal 'Username and API key are required', error.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error.message
 
     error2 = assert_raises(Kaggle::AuthenticationError) do
       Kaggle::Client.new(api_key: 'key_only')
     end
 
-    assert_equal 'Username and API key are required', error2.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error2.message
   end
 
   def test_default_values_are_applied_correctly
@@ -153,6 +153,6 @@ class Kaggle::ConfigurationTest < Minitest::Test
       Kaggle::Client.new
     end
 
-    assert_equal 'Username and API key are required', error.message
+    assert_equal 'Username and API key are required (or set cache_only: true for cache-only access)', error.message
   end
 end

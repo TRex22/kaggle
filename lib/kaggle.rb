@@ -16,4 +16,5 @@ module Kaggle
   class DatasetNotFoundError < Error; end
   class DownloadError < Error; end
   class ParseError < Error; end
+  class CacheNotFoundError < Error; end
 end
