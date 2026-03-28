@@ -31,8 +31,8 @@ GEM
     method_source (1.1.0)
     mini_mime (1.1.5)
     minitest (5.25.5)
-    minitest-focus (1.4.0)
-      minitest (>= 4, < 6)
+    minitest-focus (1.4.1)
+      minitest (> 5.0)
     minitest-reporters (1.7.1)
       ansi
       builder
@@ -74,7 +74,7 @@ PLATFORMS
 DEPENDENCIES
   kaggle!
   minitest (~> 5.25.5)
-  minitest-focus (~> 1.4.0)
+  minitest-focus (~> 1.4)
   minitest-reporters (~> 1.7.1)
   mocha (~> 2.4.5)
   pry (~> 0.15.2)
