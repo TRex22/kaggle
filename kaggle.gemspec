@@ -3,12 +3,12 @@ require_relative 'lib/kaggle/version'
 Gem::Specification.new do |spec|
   spec.name = 'kaggle'
   spec.version = Kaggle::VERSION
-  spec.authors = ['Your Name']
-  spec.email = ['your.email@example.com']
+  spec.authors = ['Jason Chalom']
+  spec.email = ['jason.chalom@gmail.com']
 
   spec.summary = 'Ruby client for the Kaggle API'
   spec.description = 'A Ruby gem for interacting with the Kaggle API, including dataset downloads with caching support'
-  spec.homepage = 'https://github.com/yourusername/kaggle'
+  spec.homepage = 'https://github.com/TRex22/kaggle'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.0.0'
 
