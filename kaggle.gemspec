@@ -30,9 +30,9 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'csv', '>= 3.3'
   spec.add_dependency 'fileutils', '>= 1.7'
-  spec.add_dependency 'httparty', '>= 0.23'
-  spec.add_dependency 'oj', '3.16.11'
-  spec.add_dependency 'rubyzip', '>= 2.0'
+  spec.add_dependency 'httparty', '>= 0.24'
+  spec.add_dependency 'oj', '>= 3.16.11'
+  spec.add_dependency 'rubyzip', '>= 3.0'
 
   spec.add_development_dependency 'minitest', '~> 5.25.5'
   spec.add_development_dependency 'minitest-focus', '~> 1.4.0'
