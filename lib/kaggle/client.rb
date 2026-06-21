@@ -98,6 +98,94 @@ module Kaggle
       raise ParseError, "Failed to parse CSV file: #{e.message}"
     end
 
+    def create_dataset(title:, dataset_id:, files:, license: 'CC0-1.0', public: false,
+                       subtitle: nil, description: nil, tags: [])
+      raise AuthenticationError, 'Cannot create datasets in cache_only mode' if @cache_only
+      dataset_id = ensure_dataset_id_owner(dataset_id)
+
+      warn "Creating dataset: #{dataset_id} with title: #{title}"
+      warn "Public: #{public}, License: #{license}"
+
+      prepared_files = prepare_files_for_upload(files)
+      warn "Prepared files for upload: #{prepared_files.map { |f| f[:name] }}"
+
+      metadata = build_create_request_payload(title: title,
+                                              dataset_id: dataset_id,
+                                              license: license,
+                                              public: public,
+                                              files: prepared_files,
+                                              subtitle: subtitle,
+                                              description: description,
+                                              tags: tags)
+      warn "Metadata generated: #{metadata}"
+
+      response = upload_via_rest(metadata: metadata, files: prepared_files)
+
+      warn "Create dataset response status: #{response.code}"
+      warn "Create dataset response headers: #{response.headers}"
+      warn "Create dataset response body: #{response.body}"
+
+      unless response.success?
+        error_msg = begin
+          error_data = Oj.load(response.body)
+          error_data['message'] || response.message
+        rescue
+          response.message
+        end
+        raise Error, "Failed to create dataset: #{error_msg}"
+      end
+
+      result = Oj.load(response.body)
+      warn "Successfully created dataset: #{result}"
+      result
+    rescue Oj::ParseError => e
+      raise ParseError, "Failed to parse create dataset response: #{e.message}"
+    end
+
+    def create_dataset_version(dataset_id:, files:, version_notes:, subtitle: nil, description: nil,
+                               tags: [], delete_old_versions: false)
+      raise AuthenticationError, 'Cannot create dataset versions in cache_only mode' if @cache_only
+      dataset_id = ensure_dataset_id_owner(dataset_id)
+
+      warn "Creating dataset version for: #{dataset_id}"
+      warn "Version notes: #{version_notes}"
+
+      owner_slug, dataset_slug = dataset_id.split('/')
+      prepared_files = prepare_files_for_upload(files)
+      warn "Prepared files for version upload: #{prepared_files.map { |f| f[:name] }}"
+
+      metadata = build_version_request_payload(owner_slug: owner_slug,
+                                               dataset_slug: dataset_slug,
+                                               version_notes: version_notes,
+                                               subtitle: subtitle,
+                                               description: description,
+                                               tags: tags,
+                                               delete_old_versions: delete_old_versions)
+      warn "Version metadata generated: #{metadata}"
+
+      response = upload_version_via_rest(metadata: metadata, files: prepared_files)
+
+      warn "Create dataset version response status: #{response.code}"
+      warn "Create dataset version response headers: #{response.headers}"
+      warn "Create dataset version response body: #{response.body}"
+
+      unless response.success?
+        error_msg = begin
+          error_data = Oj.load(response.body)
+          error_data['message'] || response.message
+        rescue
+          response.message
+        end
+        raise Error, "Failed to create dataset version: #{error_msg}"
+      end
+
+      result = Oj.load(response.body)
+      warn "Successfully queued dataset version: #{result}"
+      result
+    rescue Oj::ParseError => e
+      raise ParseError, "Failed to parse create dataset version response: #{e.message}"
+    end
+
     private
 
     def valid_credential?(credential)
@@ -256,6 +344,195 @@ module Kaggle
 
     def csv_file?(file_path)
       File.extname(file_path).downcase == '.csv'
+    end
+
+    def prepare_files_for_upload(files)
+      raise Error, 'Files must be provided as an array of paths' unless files.is_a?(Array)
+
+      files.map do |entry|
+        build_file_info(entry)
+      end
+    end
+
+    def build_file_info(entry)
+      info =
+        case entry
+        when String
+          { path: entry }
+        when Hash
+          entry.transform_keys(&:to_sym)
+        else
+          raise Error, "Invalid file entry: #{entry.inspect}"
+        end
+
+      path = info[:path]
+      raise Error, "File does not exist: #{path}" unless path && File.exist?(path)
+
+      {
+        name: info[:name] || File.basename(path),
+        path: path
+      }
+    end
+
+    def build_create_request_payload(title:, dataset_id:, license:, public:, files:, subtitle:, description:,
+                                     tags: [])
+      owner, slug = dataset_id.split('/')
+      {
+        owner_slug: owner,
+        slug: slug,
+        title: title,
+        license_name: license,
+        subtitle: subtitle || truncate_subtitle(title),
+        description: sanitize_description(description || title),
+        is_private: !public,
+        category_ids: tags || [],
+        resources: files.map { |file| { path: File.basename(file[:path]) } }
+      }
+    end
+
+    def build_version_request_payload(owner_slug:, dataset_slug:, version_notes:, subtitle:, description:, tags: [],
+                                      delete_old_versions: false)
+      {
+        owner_slug: owner_slug,
+        dataset_slug: dataset_slug,
+        body: {
+          version_notes: version_notes,
+          subtitle: subtitle,
+          description: sanitize_description(description || ''),
+          delete_old_versions: delete_old_versions,
+          category_ids: tags || []
+        }
+      }
+    end
+
+    # REST upload helpers --------------------------------------------------
+
+    def upload_via_rest(metadata:, files: [])
+      warn "Starting REST upload for dataset: #{metadata[:owner_slug]}/#{metadata[:slug]}"
+      new_files = files.map do |file_info|
+        token = upload_blob(file_info)
+        build_rest_file(token)
+      end
+
+      payload = metadata.merge(files: new_files)
+      warn "REST payload prepared: #{payload}"
+
+      options = {
+        body: Oj.dump(camelize_keys(payload), mode: :compat),
+        headers: {
+          'Content-Type' => 'application/json'
+        }
+      }
+
+      authenticated_request(:post, '/datasets/create/new', options)
+    end
+
+    def upload_version_via_rest(metadata:, files: [])
+      warn "Starting REST version upload for dataset: #{metadata[:owner_slug]}/#{metadata[:dataset_slug]}"
+
+      new_files = files.map do |file_info|
+        token = upload_blob(file_info)
+        build_rest_file(token)
+      end
+
+      version_body = metadata[:body].merge(files: new_files)
+      warn "Version payload (pre-camelize): #{version_body}"
+
+      options = {
+        body: Oj.dump(camelize_keys(version_body), mode: :compat),
+        headers: {
+          'Content-Type' => 'application/json'
+        }
+      }
+
+      endpoint = "/datasets/create/version/#{metadata[:owner_slug]}/#{metadata[:dataset_slug]}"
+      authenticated_request(:post, endpoint, options)
+    end
+
+    def upload_blob(file_info)
+      warn "Starting blob upload for #{file_info[:name]}"
+      timestamp = File.mtime(file_info[:path]).to_i
+      body = {
+        type: 'DATASET',
+        name: file_info[:name],
+        content_length: File.size(file_info[:path]),
+        last_modified_epoch_seconds: timestamp
+      }
+
+      response = authenticated_request(:post, '/blobs/upload',
+                                       body: Oj.dump(body, mode: :compat),
+                                       headers: {
+                                         'Content-Type' => 'application/json'
+                                       })
+
+      raise Error, "Failed to start blob upload: #{response.message}" unless response.success?
+
+      data = Oj.load(response.body)
+      upload_url = data['createUrl']
+      token = data['token']
+
+      upload_file_contents(upload_url, file_info[:path])
+
+      token
+    rescue Oj::ParseError => e
+      raise ParseError, "Failed to parse blob upload response: #{e.message}"
+    end
+
+    def upload_file_contents(url, path)
+      warn "Uploading file contents to blob storage: #{url}"
+      File.open(path, 'rb') do |file|
+        response = HTTParty.put(url, body: file.read,
+                                     headers: {
+                                       'Content-Type' => 'application/octet-stream'
+                                     })
+        raise Error, "Failed to upload file contents: #{response.message}" unless response.success?
+      end
+    rescue StandardError => e
+      raise Error, "File upload failed: #{e.message}"
+    end
+
+    def build_rest_file(token)
+      { token: token }
+    end
+
+    def truncate_subtitle(text)
+      text.length < 20 ? text.ljust(20, ' ') : text[0, 80]
+    end
+
+    def sanitize_description(text)
+      text.strip.empty? ? 'Dataset created via Kaggle Ruby Client' : text
+    end
+
+    def ensure_dataset_id_owner(dataset_id)
+      return dataset_id if dataset_id.include?('/')
+
+      raise AuthenticationError, 'Username is required to infer dataset owner' unless @username
+
+      "#{@username}/#{dataset_id}"
+    end
+
+    def camelize_keys(value)
+      case value
+      when Array
+        value.map { |item| camelize_keys(item) }
+      when Hash
+        value.each_with_object({}) do |(key, val), result|
+          result[camelize(key)] = camelize_keys(val)
+        end
+      else
+        value
+      end
+    end
+
+    def camelize(key)
+      return key unless key.respond_to?(:to_s)
+      string_key = key.to_s
+      parts = string_key.split('_')
+      return parts.first if parts.length <= 1
+
+      head = parts.shift
+      camel_tail = parts.map { |part| part.capitalize }
+      ([head] + camel_tail).join
     end
   end
 end

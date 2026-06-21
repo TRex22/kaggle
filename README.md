@@ -151,6 +151,35 @@ files = client.dataset_files('zillow', 'zecon')
 data = client.parse_csv_to_json('/path/to/file.csv')
 ```
 
+### Create Datasets and Versions
+
+```ruby
+require 'kaggle'
+
+client = Kaggle::Client.new # assumes credentials available
+
+# Create a new dataset
+client.create_dataset(
+  title: 'Your awesome dataset',
+  dataset_id: 'awesome-dataset',
+  files: ['data/awesome_dataset.csv'],
+  subtitle: 'Great data available to all',
+  description: 'Long description so everyone can enjoy. Kaggle needs a long description here to increase the usability score of the database. The description also helps other members to make sense of your dataset with minimal effort, so please add a comprehensive text. ',
+  tags: ['Finance'],
+  license: 'CC0-1.0',
+  public: true
+)
+
+# Queue a new version (e.g. after updating files)
+client.create_dataset_version(
+  dataset_id: 'awesome-dataset',
+  files: ['data/awesome_dataset_v2.csv'],
+  version_notes: 'Updated with fixes.'
+)
+```
+
+> Kaggle currently ignores file and column descriptions in API requests. For richer metadata, create the dataset first and then edit it in the Kaggle UI.
+
 ## Command Line Interface
 
 The gem includes a command-line interface:

@@ -12,7 +12,9 @@ module Kaggle
     DATASET_ENDPOINTS = {
       view: '/datasets/view',
       download: '/datasets/download',
-      files: '/datasets/data'
+      files: '/datasets/data',
+      create: '/datasets/create/new',
+      versions: '/datasets/create/version'
     }.freeze
 
     REQUIRED_HEADERS = {

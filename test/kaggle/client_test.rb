@@ -232,6 +232,90 @@ class Kaggle::ClientTest < Minitest::Test
     end
   end
 
+  def test_create_dataset_sends_expected_payload
+    temp_file = Tempfile.new(['dataset', '.csv'])
+    temp_file.write("col\nvalue\n")
+    temp_file.close
+
+    client = Kaggle::Client.new(username: @username, api_key: @api_key)
+
+    tokens = %w[token123]
+    captured = {}
+    client.stub(:upload_blob, ->(_file_info) { tokens.shift }) do
+      response = Struct.new(:code, :headers, :body) do
+        def success? = true
+      end
+
+      client.stub(:authenticated_request, lambda do |method, endpoint, options|
+        captured[:method] = method
+        captured[:endpoint] = endpoint
+        captured[:options] = options
+        response.new(200, {}, { ref: 'ok' }.to_json)
+      end) do
+        client.create_dataset(
+          title: 'Sample Dataset',
+          dataset_id: 'sample-dataset',
+          files: [{ path: temp_file.path }],
+          subtitle: 'Subtitle text',
+          description: 'Description text',
+          tags: ['finance'],
+          public: true
+        )
+      end
+    end
+
+    payload = Oj.load(captured[:options][:body])
+    assert_equal :post, captured[:method]
+    assert_equal '/datasets/create/new', captured[:endpoint]
+    assert_equal 'Sample Dataset', payload['title']
+    assert_equal ['finance'], payload['categoryIds']
+    assert_equal [{ 'token' => 'token123' }], payload['files']
+    assert_equal [{ 'path' => File.basename(temp_file.path) }], payload['resources']
+  ensure
+    temp_file.unlink if temp_file
+  end
+
+  def test_create_dataset_version_sends_expected_payload
+    temp_file = Tempfile.new(['dataset_version', '.csv'])
+    temp_file.write("col\nvalue\n")
+    temp_file.close
+
+    client = Kaggle::Client.new(username: @username, api_key: @api_key)
+
+    tokens = %w[token456]
+    captured = {}
+    client.stub(:upload_blob, ->(_file_info) { tokens.shift }) do
+      response = Struct.new(:code, :headers, :body) do
+        def success? = true
+      end
+
+      client.stub(:authenticated_request, lambda do |method, endpoint, options|
+        captured[:method] = method
+        captured[:endpoint] = endpoint
+        captured[:options] = options
+        response.new(200, {}, { status: 'queued' }.to_json)
+      end) do
+        client.create_dataset_version(
+          dataset_id: 'sample-dataset',
+          files: [{ path: temp_file.path }],
+          version_notes: 'notes',
+          subtitle: 'Subtitle text',
+          description: 'Description text',
+          tags: ['finance']
+        )
+      end
+    end
+
+    payload = Oj.load(captured[:options][:body])
+    assert_equal :post, captured[:method]
+    assert_equal '/datasets/create/version/test_user/sample-dataset', captured[:endpoint]
+    assert_equal 'notes', payload['versionNotes']
+    assert_equal ['finance'], payload['categoryIds']
+    assert_equal [{ 'token' => 'token456' }], payload['files']
+  ensure
+    temp_file.unlink if temp_file
+  end
+
   private
 
   def create_temp_csv(content)
