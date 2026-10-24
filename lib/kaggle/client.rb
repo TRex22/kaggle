@@ -173,10 +173,16 @@ module Kaggle
 
     def extract_zip_file(zip_file_path, extract_to_dir)
       FileUtils.mkdir_p(extract_to_dir)
+      base_dir = File.expand_path(extract_to_dir)
 
       Zip::File.open(zip_file_path) do |zip_file|
         zip_file.each do |entry|
-          extract_path = File.join(extract_to_dir, entry.name)
+          extract_path = File.expand_path(File.join(base_dir, entry.name))
+
+          # Reject entries that would be written outside the extraction directory (zip-slip)
+          unless extract_path.start_with?("#{base_dir}#{File::SEPARATOR}")
+            raise DownloadError, "Unsafe path in zip file: #{entry.name}"
+          end
 
           if entry.directory?
             # Create directory

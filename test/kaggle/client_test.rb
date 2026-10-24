@@ -232,6 +232,20 @@ class Kaggle::ClientTest < Minitest::Test
     end
   end
 
+  def test_extract_zip_file_rejects_path_traversal_entries
+    Dir.mktmpdir do |dir|
+      extract_dir = File.join(dir, 'out')
+      entry = stub(name: '../escaped.txt', directory?: false)
+      Zip::File.stubs(:open).yields([entry])
+
+      error = assert_raises(Kaggle::DownloadError) do
+        @client.send(:extract_zip_file, File.join(dir, 'evil.zip'), extract_dir)
+      end
+      assert_match(/Unsafe path/, error.message)
+      refute File.exist?(File.join(dir, 'escaped.txt'))
+    end
+  end
+
   private
 
   def create_temp_csv(content)
